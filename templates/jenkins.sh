@@ -1,7 +1,8 @@
-
 #!/bin/bash
 # Installing JAVA && Jenkins 
 sudo yum update –y
+sudo yum install java-11-amazon-corretto-headless -y 
+sudo yum remove java-17-amazon-corretto-headless -y
 sudo wget -O /etc/yum.repos.d/jenkins.repo https://pkg.jenkins.io/redhat-stable/jenkins.repo
 sudo rpm --import https://pkg.jenkins.io/redhat-stable/jenkins.io.key
 sudo yum upgrade
@@ -19,11 +20,11 @@ pip3 install ansible
 # Installing Docker 
 yum install docker -y
 service docker start
-service docker status
 sudo useradd dockeradmin
 # sudo passwd dockeradmin TODO LIST
 sudo usermod -aG docker dockeradmin
-sudo chmod 666 /var/run/docker.sock
+sudo usermod -aG docker jenkins
+sudo chmod 777 /var/run/docker.sock
 # install Sonarqube scanner
 mkdir sonnar-canna && cd sonnar-canna
 sudo unzip sonar-scanner-cli-4.6.2.2472-linux.zip
@@ -34,16 +35,13 @@ wget https://binaries.sonarsource.com/Distribution/sonar-scanner-cli/sonar-scann
 # Installing maven
 sudo su
 mkdir /opt/maven && cd /opt/maven
+wget https://mirror.lyrahosting.com/apache/maven/maven-3/3.8.7/binaries/apache-maven-3.8.7-bin.tar.gz
+tar -xvzf apache-maven-3.8.7-bin.tar.gz
 
-wget https://dlcdn.apache.org/maven/maven-3/3.0.5/binaries/apache-maven-3.0.5-bin.tar.gz
-#wget https://dlcdn.apache.org/maven/maven-3/3.8.4/binaries/apache-maven-3.8.4-bin.tar.gz
-tar -xvzf apache-maven-3.0.5-bin.tar.gz
-# echo  "JAVA_HOME=/usr/lib/jvm/java-1.8.0-openjdk-1.8.0.302.b08-0.amzn2.M2_HOME=/opt/maven/apache-maven-3.8.4 M2=$M2_HOME/bin PATH=$PATH:$HOME/bin:$M2_HOME:$M2:$JAVA_HOME" > file10.1.x86_64  
-# cat >> ~/.bash_profile 
-# JAVA_HOME=/usr/lib/jvm/java-1.8.0-openjdk-1.8.0.302.b08-0.amzn2.0.1.x86_64
-# M2_HOME=/opt/maven/apache-maven-3.0.5/bin
-# M2=$M2_HOME/bin
-# PATH=$PATH:$HOME/bin:$M2_HOME:$M2:$JAVA_HOME 
+echo 'M2_HOME=/opt/maven/apache-maven-3.8.7/bin' >> ~/.bash_profile
+echo 'export PATH=$PATH:$HOME/bin:$M2_HOME' >> ~/.bash_profile
+sudo source ~/.bash_profile
+
 sudo useradd ansible
 sudo useradd jenkins
 sudo -u jenkins mkdir /home/jenkins.ssh
@@ -62,3 +60,13 @@ sudo pip3 install awscli boto3 botocore --upgrade --user
 sudo yum install -y yum-utils
 sudo yum-config-manager --add-repo https://rpm.releases.hashicorp.com/AmazonLinux/hashicorp.repo
 sudo yum -y install terraform
+## Install helm
+sudo curl -fsSL -o get_helm.sh https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3
+sudo chmod 700 get_helm.sh
+sudo bash get_helm.sh
+## install kubelet
+sudo curl -O https://s3.us-west-2.amazonaws.com/amazon-eks/1.19.6/2021-01-05/bin/linux/amd64/kubectl
+sudo chmod +x ./kubectl
+sudo mkdir -p $HOME/bin && cp ./kubectl $HOME/bin/kubectl && export PATH=$PATH:$HOME/bin
+sudo echo 'export PATH=$PATH:$HOME/bin' >> ~/.bashrc
+sudo kubectl version --short --client

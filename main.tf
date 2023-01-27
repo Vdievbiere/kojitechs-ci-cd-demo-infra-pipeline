@@ -4,7 +4,15 @@
 ################################################################################
 
 terraform {
-  required_version = ">=1.1.0" 
+  required_version = ">=1.1.0" # version
+
+ backend "s3" {
+    bucket         = "cicd-pipelin-infra-project.tf" # s3 bucket 
+    key            = "path/env/kojitechs-ci-cd-demo-infra-pipeline-tf"
+    region         = "us-east-1"
+    # dynamodb_table = "terraform-lock"
+    # encrypt        = "true"
+  }
 
   required_providers {
     aws = {
@@ -13,6 +21,8 @@ terraform {
     }
   }
 }
+
+
 
 ################################################################################
 # PROVIDERS BLOCK
@@ -31,7 +41,6 @@ locals {
    azs = data.aws_availability_zones.available.names
 
 }
-
 
 ################################################################################
 # DATA SOURCE BLOCK
@@ -72,6 +81,12 @@ resource "aws_instance" "jenkins-server" {
   tags = {
     Name = "jenkins-server"
   }
+lifecycle {
+    ignore_changes = [
+      user_data,
+    ]
+  }
+
 }
 
 resource "aws_instance" "sonarqube-server" {
@@ -85,8 +100,6 @@ resource "aws_instance" "sonarqube-server" {
     Name = "sonarqube-server"
   }
 }
-
-
 ################################################################################
 # MODULES BLOCK
 ################################################################################
@@ -103,9 +116,28 @@ module "vpc" {
 
   enable_nat_gateway = true
   enable_vpn_gateway = true
+  enable_dns_hostnames = true
 
-  tags = {
-    Terraform = "true"
-    Environment = "dev"
+  enable_flow_log                      = true
+  create_flow_log_cloudwatch_iam_role  = true
+  create_flow_log_cloudwatch_log_group = true
+
+  public_subnet_tags = {
+    Type                                                   = "Public Subnets"
+    "kubernetes.io/role/elb"                               = 1
+    "kubernetes.io/cluster/${var.component_name}-eks-demo" = "shared"
+  }
+  private_subnet_tags = {
+    Type                                                   = "private-subnets"
+    "kubernetes.io/role/internal-elb"                      = 1
+    "kubernetes.io/cluster/${var.component_name}-eks-demo" = "shared"
+  }
+  database_subnet_tags = {
+    Type = "database-subnets"
   }
 }
+
+  # tags = {
+  #   Terraform = "true"
+  #   Environment = "dev"
+  # }

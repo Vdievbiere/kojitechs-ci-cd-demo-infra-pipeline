@@ -1,7 +1,7 @@
 
-
-resource "aws_iam_role" "ssm_fleet_ec2" {
-  name = "jenkins-role"
+#IAM Service role.
+resource "aws_iam_role" "eks_nodegroup_role" {
+  name = upper(format("%s-%s", var.component_name, "nodegroup-role"))
 
   assume_role_policy = jsonencode({
     Version = "2012-10-17"
@@ -9,26 +9,37 @@ resource "aws_iam_role" "ssm_fleet_ec2" {
       {
         Action = "sts:AssumeRole"
         Effect = "Allow"
-        Sid    = ""
         Principal = {
           Service = "ec2.amazonaws.com"
         }
       },
     ]
   })
-
-  tags = {
-    tag-key = "jenkins-role"
-  }
 }
 
 resource "aws_iam_instance_profile" "instance_profile" {
-  name = "jenkins-instance-profile"
-  role = aws_iam_role.ssm_fleet_ec2.name
+  name = format("%s-%s", var.component_name, "instance-profile")
+  role = aws_iam_role.eks_nodegroup_role.name
 }
 
+resource "aws_iam_role_policy_attachment" "eks-AmazonEKSWorkerNodePolicy" {
+  policy_arn = "arn:aws:iam::aws:policy/AmazonEKSWorkerNodePolicy"
+  role       = aws_iam_role.eks_nodegroup_role.name
+}
+
+resource "aws_iam_role_policy_attachment" "eks-AmazonEKS_CNI_Policy" {
+  policy_arn = "arn:aws:iam::aws:policy/AmazonEKS_CNI_Policy"
+  role       = aws_iam_role.eks_nodegroup_role.name
+}
+
+resource "aws_iam_role_policy_attachment" "eks-AmazonEC2ContainerRegistryReadOnly" {
+  policy_arn = "arn:aws:iam::aws:policy/AmazonEC2ContainerRegistryReadOnly"
+  role       = aws_iam_role.eks_nodegroup_role.name
+}
+
+#IAM policy
 resource "aws_iam_policy" "policy" {
-  name        = "jenkins-policy"
+  name        = format("%s-%s", var.component_name, "fleet-managerpolicy")
   description = "Access  policy of ec2 to ssm fleet"
   policy      = <<EOF
 {
@@ -36,47 +47,53 @@ resource "aws_iam_policy" "policy" {
   "Statement": [
     {
       "Action": [
-        "logs:CreateLogGroup",
-        "logs:CreateLogStream",
-        "logs:PutLogEvents",
-          "ec2:*",
-          "ec2messages:*",
-          "ecr:*",
-          "ecs:*",
-          "elasticfilesystem:*",
-          "elasticache:*",
-          "elasticloadbalancing:*",
-          "es:*",
-          "events:*",
-          "iam:*",
-          "kms:*",
-          "lambda:*",
-          "logs:*",
-          "rds:*",
-          "route53:*",
-          "ssm:*",
-          "ssmmessages:*",
-          "secretsmanager:*",
-          "s3:*",
-          "dynamodb:*",
-          "acm:*",
-          "sns:*",
-          "sqs:*",
-          "ec2:DescribeNetworkInterfaces",
-          "ec2:CreateNetworkInterface",
-          "ec2:DeleteNetworkInterface",
-          "ec2:DescribeInstances",
-          "ec2:AttachNetworkInterface"
+         "ssm:UpdateInstanceInformation",
+          "ssmmessages:CreateControlChannel",
+          "ssmmessages:CreateDataChannel",
+          "ssmmessages:OpenControlChannel",
+          "ssmmessages:OpenDataChannel"
       ],
       "Resource": "*",
       "Effect": "Allow"
     }
-  ]
+     ]
 }
 EOF
 }
 
-resource "aws_iam_role_policy_attachment" "ec2_policy_attach" {
-  role       = aws_iam_role.ssm_fleet_ec2.name
+#Role and Policy attachment
+resource "aws_iam_role_policy_attachment" "role_policy_attach" {
+  role       = aws_iam_role.eks_nodegroup_role.name
   policy_arn = aws_iam_policy.policy.arn
+}
+
+# Create IAM Role For Master Node
+resource "aws_iam_role" "eks_master_role" {
+  name = format("%s-%s", var.component_name, "master-role")
+
+  assume_role_policy = <<POLICY
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Effect": "Allow",
+      "Principal": {
+        "Service": "eks.amazonaws.com"
+      },
+      "Action": "sts:AssumeRole"
+    }
+  ]
+}
+POLICY
+}
+
+# Associate IAM Policy to IAM Role
+resource "aws_iam_role_policy_attachment" "eks-AmazonEKSClusterPolicy" {
+  policy_arn = "arn:aws:iam::aws:policy/AmazonEKSClusterPolicy"
+  role       = aws_iam_role.eks_master_role.name
+}
+
+resource "aws_iam_role_policy_attachment" "eks-AmazonEKSVPCResourceController" {
+  policy_arn = "arn:aws:iam::aws:policy/AmazonEKSVPCResourceController"
+  role       = aws_iam_role.eks_master_role.name
 }
